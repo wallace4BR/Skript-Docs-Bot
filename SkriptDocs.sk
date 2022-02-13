@@ -1,0 +1,208 @@
+load:
+	load yaml "plugins/SkriptBot/bot.yml" as "bot"
+	if yaml "bot" is empty:
+		set yaml value "Bot.Token" from "bot" to "BotToken"
+		save yaml "bot"
+	"SkriptBot" is not loaded over discord
+	make new discord bot:
+		enable all default intents
+		login to "%yaml value "Bot.Token" from "bot" to "BotToken"%" with name "SkriptBot"
+
+effect generate docs:
+	trigger:
+		send a http request to "https://api.skripttools.net/v4/documentation"
+		map json of last http response's body to {docs::*}
+		#loop {docs::data::*}
+		#	set {index} to loop-index
+
+#Main docs command
+discord command .d [<text>]:
+	aliases: docs
+	trigger:
+		if arg-1 is not set:
+			reply to event-message with "%mention tag of reaction "x"% You need to specify an argument to search over docs!" with bot "SkriptBot"
+			stop
+		if {docs::*} is not set: 
+			generate docs
+		set {_a} to now
+		loop {docs::data::*}:
+			set {_type} to {docs::data::%loop-index%::type}
+			set {_name} to {docs::data::%loop-index%::name}
+			set {_addon} to {docs::data::%loop-index%::addon}
+			set {_desc} to {docs::data::%loop-index%::description}
+			set {_patterns} to join {docs::data::%loop-index%::patterns} with nl
+			set {_values} to join {docs::data::%loop-index%::event_values} with "\n"
+			if "%{_name}%%{_desc}%" contains arg-1:
+				#broadcast "%{_name}% %{_desc}%"
+				if {_type} = "events":
+					add "%{_name}%|%{_addon}%|%{_desc} if {_desc} is set else "Click to show this documentation page"%" to {_events::*}
+				if {_type} = "effects":
+					add "%{_name}%|%{_addon}%|%{_desc} if {_desc} is set else "Click to show this documentation page"%" to {_effects::*}
+				if {_type} = "sections":
+					add "%{_name}%|%{_addon}%|%{_desc} if {_desc} is set else "Click to show this documentation page"%|%loop-index%" to {_sections::*}
+				if {_type} = "expressions":
+					add "%{_name}%|%{_addon}%|%{_desc} if {_desc} is set else "Click to show this documentation page"%|%loop-index%" to {_expressions::*}
+				if {_type} = "conditions":
+					add "%{_name}%|%{_addon}%|%{_desc} if {_desc} is set else "Click to show this documentation page"%|%loop-index%" to {_conditions::*}
+
+		set {_b} to new embed
+		if {_events::*} is set:
+			make new dropdown with id "events":
+				loop {_events::*}:
+					add 1 to {_eventscount}
+					set {_split::*} to split loop-value at "|"
+					set {_name} to {_split::1}
+					add "%{_name}%" to {_evns::*}
+					set {_addon} to {_split::2}
+					set {_desc} to first 100 characters of {_split::3}
+					if length of {_name} + length of {_addon} < 77:
+						add new choice with value "%loop-index%" with name "%{_name}% (%{_addon}%)" with desc "%{_desc}%" with reaction "orange_book" to choices of dropdown
+					if {_eventscount} >= 25:
+						stop loop
+				add inline field named "Events 📙" with value "%join {_evns::*} by nl%" to {_b}
+				set min range of dropdown to 1
+				set max range of dropdown to 1
+				set placeholder of dropdown to "Select within %{_eventscount}% events 📙"
+			set {_events} to last dropdown
+		if {_effects::*} is set:
+			make new dropdown with id "effects":
+				loop {_effects::*}:
+					add 1 to {_effcount}
+					set {_split::*} to split loop-value at "|"
+					set {_name} to {_split::1}
+					add "%{_name}%" to {_eff::*}
+					set {_addon} to {_split::2}
+					set {_desc} to first 100 characters of {_split::3}
+					if length of {_name} + length of {_addon} < 80:
+						add new choice with value "%loop-index%" with name "%{_name}% (%{_addon}%)" with desc "%{_desc}%" with reaction "blue_book" to choices of dropdown
+					if {_effcount} >= 25:
+						stop loop
+				add inline field named "Effects 📘" with value "%join {_eff::*} by nl%" to {_b}
+				set min range of dropdown to 1
+				set max range of dropdown to 1
+				set placeholder of dropdown to "Select within %{_effcount}% effects 📘"
+			set {_effects} to last dropdown
+		if {_expressions::*} is set:
+			make new dropdown with id "expressions":
+				loop {_expressions::*}:
+					add 1 to {_exprcount}
+					set {_split::*} to split loop-value at "|"
+					set {_name} to {_split::1}
+					add "%{_name}%" to {_exprs::*}
+					set {_addon} to {_split::2}
+					set {_desc} to first 100 characters of {_split::3}
+					if length of {_name} + length of {_addon} < 80:
+						add new choice with value "%loop-index%" with name "%{_name}% (%{_addon}%)" with desc "%{_desc}%" with reaction "green_book" to choices of dropdown
+					if {_exprcount} >= 25:
+						stop loop
+				add inline field named "Expressions 📗" with value "%join {_exprs::*} by nl%" to {_b}
+				set min range of dropdown to 1
+				set max range of dropdown to 1
+				set placeholder of dropdown to "Select within %{_exprcount}% expressions 📗"
+			set {_expr} to last dropdown
+		if {_conditions::*} is set:
+			make new dropdown with id "conditions":
+				loop {_conditions::*}:
+					add 1 to {_condcount}
+					set {_split::*} to split loop-value at "|"
+					set {_name} to {_split::1}
+					add "%{_name}%" to {_conds::*}
+					set {_addon} to {_split::2}
+					set {_desc} to first 100 characters of {_split::3}
+					if length of {_name} + length of {_addon} < 80:
+						add new choice with value "%loop-index%" with name "%{_name}% (%{_addon}%)" with desc "%{_desc}%" with reaction "closed_book" to choices of dropdown
+					if {_condcount} >= 25:
+						stop loop
+				add inline field named "Conditions 📕" with value "%join {_conds::*} by nl%" to {_b}
+				set min range of dropdown to 1
+				set max range of dropdown to 1
+				set placeholder of dropdown to "Select within %{_condcount}% conditions 📕"
+			set {_conditions} to last dropdown
+		if {_sections::*} is set:
+			make new dropdown with id "sections":
+				loop {_sections::*}:
+					add 1 to {_sectcount}
+					set {_split::*} to split loop-value at "|"
+					set {_name} to {_split::1}
+					add "%{_name}%" to {_sects::*}
+					set {_addon} to {_split::2}
+					set {_desc} to first 100 characters of {_split::3}
+					if length of {_name} + length of {_addon} < 80:
+						add new choice with value "%loop-index%" with name "%{_name}% %{_addon}%" with desc "%{_desc}%" with reaction "bookmark" to choices of dropdown
+					if {_sectcount} >= 25:
+						stop loop
+				add inline field named "Sections 📑" with value "%join {_sects::*} by nl%" to {_b}
+				set min range of dropdown to 1
+				set max range of dropdown to 1
+				set placeholder of dropdown to "Select within %{_sectcount}% sections 📑"
+			set {_sections} to last dropdown
+		set {_amount} to {_effcount} + {_condcount} + {_sectcount} + {_exprcount} + {_eventscount}
+		set author of {_b} to "Found %{_amount}% syntaxes!"
+		reply to event-message with {_b} with bot "SkriptBot" with row {_events}, {_effects}, {_expressions}, {_conditions}, {_sections}
+		broadcast "%difference between now and {_a}%"
+
+dropdown interact:
+	if event-dropdown = "events" or "effects" or "expressions" or "conditions" or "sections":
+		set {_name} to event.getJDAEvent().getSelectedOptions().get(0).getLabel()
+		set {_name::*} to split {_name} at "("
+		set {_name} to {_name::1}
+		loop {docs::data::*}:
+			set {_name2} to {docs::data::%loop-index%::name}
+			if "%{_name}%" = "%{_name2}% ":
+				set {_type} to {docs::data::%loop-index%::type}
+				set {_addon} to {docs::data::%loop-index%::addon}
+				set {_desc} to {docs::data::%loop-index%::description}
+				set {_patterns} to join {docs::data::%loop-index%::patterns} with nl
+				set {_values} to join {docs::data::%loop-index%::event_values} with "\n"
+				set {_examples} to join {docs::data::%loop-index%::examples} with nl
+				set {_cancellable} to {docs::data::%loop-index%::cancellable}
+				make embed:
+					set author of embed to "%{_name}% [%event-dropdown%]"
+					set color of embed to orange
+
+					add ":pencil: **Patterns:** ```applescript%nl%%{_patterns}%```" to {_l::*}
+
+					if {_desc} is set:
+						add ":file_folder: **Description:** %nl%*%{_desc}%*%nl%" to {_l::*}
+
+					if {_examples} is set:
+						add ":label: **Example(s):** ```applescript%nl%%{_examples}%%nl%```" to {_l::*}
+					
+					if {_type} is "events" or "scopes":
+						add ":placard: **Possible Event-Values:** ```%{_values} if {_values} is not "none" else "null"%```" to {_l::*}
+						if {_type} is "events":
+							if {_cancellable} is set:
+								if {_cancellable} is "0":
+									add "**Cancealable Event** %mention tag of reaction "x"%" to {_l::*}
+								if {_cancellable} is "1":
+									add "**Cancealable Event** %mention tag of reaction "white_check_mark"%" to {_l::*}
+					set description of embed to join {_l::*} with nl
+					add inline field named "Addon" with value "%{_addon}%" to embed
+					set footer of embed to "Powered by skripttools api"
+					set footer icon of embed to avatar of event-member
+					set timestamp of embed to now
+				reply with hidden last embed
+				stop loop
+
+#Some commands ported from Skript Bot#3042 from Big_Bad_E#1446
+
+discord command .indent:
+	trigger:
+		set {_b} to new buttons row
+		add new link button with url "https://skripthub.net/tutorials/33" with style success with content "Indent" to buttons of {_b}
+		make embed:
+			set color of embed to color from rgb 0,255,0
+			set description of embed to "```css%nl%""Error: Indentation error at line X, expected X tabs/spaces, but found X tabs/spaces""```%nl%Or something similar, and you don't know how to fix it, read this tutorial at the button below."
+			set footer of embed to "Tutorial made by CharcoalToast"
+			set footer icon of embed to avatar of event-member
+		reply with last embed with row {_b} with bot "SkriptBot"
+
+discord command .format:
+	trigger:
+		make embed:
+			set title of embed to "Formatting Code In Discord"
+			add field named "Why?" with value "Code blocks make it easier for helpers to identify potential errors -- help them help you!" to embed
+			add inline field named "How it Looks" with value "\```on chat:%nl%broadcast ""This is how you format code!""```" to embed
+			add inline field named "The format" with value "```vb%nl%on chat:%nl%broadcast ""This is how you format code!""```" to embed
+			add field named "Extra Info" with value "On US keyboards, the grave character (`) is located above the tab key on the top left of the keyboard" to embed
+		reply to event-message with last embed with bot "SkriptBot"
