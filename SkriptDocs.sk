@@ -4,7 +4,21 @@
 #Fixed search on skripthub 22/02
 #Fixed filtering on skripthub 23/02
 
-#Add an fallback if results wasn't found 23/02/
+#Add an fallback if results wasn't found 23/02
+#Added 23/02
+
+effect generate docs:
+	trigger:
+		send a http request to "https://api.skripttools.net/v4/documentation"
+		if last http response's code = 200:
+			map json of last http response's body to {-docs::*}
+		else:
+			broadcast "An exception has occured while generating docs! %nl% %last http response's body%"
+		send a http request to "https://api.skripttools.net/v4/documentation/skripthub"
+		if last http response's code = 200:
+			map json of last http response's body to {-skhubdocs::*}
+		else:
+			broadcast "An exception has occured while generating docs! %nl% %last http response's body%"
 
 load:
 	load yaml "plugins/SkriptBot/bot.yml" as "bot"
@@ -15,23 +29,9 @@ load:
 	make new discord bot:
 		enable all default intents
 		login to "%yaml value "Bot.Token" from "bot"%" with name "SkriptBot"
-
-effect generate docs:
-	trigger:
-		send a http request to "https://api.skripttools.net/v4/documentation"
-		if last http response's code = 200:
-			map json of last http response's body to {docs::*}
-		else:
-			broadcast "An exception has occured while generating docs! %nl% %last http response's body%"
-		send a http request to "https://api.skripttools.net/v4/documentation/skripthub"
-		if last http response's code = 200:
-			map json of last http response's body to {skhubdocs::*}
-		else:
-			broadcast "An exception has occured while generating docs! %nl% %last http response's body%"
+	generate docs
 
 function DocsEmbed(docs: text, type: text, member: member, msg: message):
-	if {docs::*} is not set: 
-		generate docs
 	set {_realdocs} to {_docs}
 	set {_docs::*} to split {_docs} at ":"
 	if {_docs::1} is set:
@@ -40,22 +40,21 @@ function DocsEmbed(docs: text, type: text, member: member, msg: message):
 			if {_docs::2} is set:
 				set {_filter} to {_docs::2}
 			if {_length} > 4:
-				broadcast "%length of {_docs::1}% %{_docs}%"
+				#broadcast "%length of {_docs::1}% %{_docs}%"
 				set {_realdocs} to first {_length} -4 characters of {_docs::1} 
 			else:
 				set {_filteronly} to true
-	broadcast "Tamanho: %{_length}%"
-	broadcast "Pesquisa: %{_docs}%"
-	broadcast "Filtro 1: %{_filter}%"
-	broadcast "FilterOnly: %{_filteronly}%"
+	#broadcast "Tamanho: %{_length}%"
+	#broadcast "Pesquisa: %{_docs}%"
+	#broadcast "Filtro 1: %{_filter}%"
+	#broadcast "FilterOnly: %{_filteronly}%"
 	if {_type} = "sktools":
-		broadcast "a"
-		loop {docs::data::*}:
-			set {_syntaxtype} to {docs::data::%loop-index%::type}
-			set {_name} to {docs::data::%loop-index%::name}
-			set {_addon} to {docs::data::%loop-index%::addon}
-			set {_desc} to {docs::data::%loop-index%::description}
-			broadcast "Filter only é: %{_filteronly}%" if {_filteronly} is set
+		loop {-docs::data::*}:
+			set {_syntaxtype} to {-docs::data::%loop-index%::type}
+			set {_name} to {-docs::data::%loop-index%::name}
+			set {_addon} to {-docs::data::%loop-index%::addon}
+			set {_desc} to {-docs::data::%loop-index%::description}
+			#broadcast "Filter only é: %{_filteronly}%" if {_filteronly} is set
 			if {_filteronly} is true:
 				if "%{_addon}%" = "%{_filter}%":
 					broadcast "Addon: %{_addon}% faz parte do %{_filter}%"
@@ -97,11 +96,11 @@ function DocsEmbed(docs: text, type: text, member: member, msg: message):
 						if {_syntaxtype} = "conditions":
 							add "%{_name}%|%{_addon}%|%{_desc} if {_desc} is set else "Click to show this documentation page"%" to {_conditions::*}
 	if {_type} = "skhub":
-		loop {skhubdocs::*}:
-			set {_syntaxtype} to {skhubdocs::%loop-index%::syntax_type}
-			set {_name} to {skhubdocs::%loop-index%::title}
-			set {_addon} to {skhubdocs::%loop-index%::addon::name}
-			set {_desc} to {skhubdocs::%loop-index%::description}
+		loop {-skhubdocs::*}:
+			set {_syntaxtype} to {-skhubdocs::%loop-index%::syntax_type}
+			set {_name} to {-skhubdocs::%loop-index%::title}
+			set {_addon} to {-skhubdocs::%loop-index%::addon::name}
+			set {_desc} to {-skhubdocs::%loop-index%::description}
 			if {_filteronly} is true:
 				if "%{_addon}%" = "%{_filter}%":
 					if {_syntaxtype} = "event":
@@ -258,6 +257,9 @@ function DocsEmbed(docs: text, type: text, member: member, msg: message):
 	set author of {_b} to "Found %{_amount}% syntaxes!"
 	set color of {_b} to color from rgb 255,165,0
 	if {_type} = "sktools":
+		if {_amount} = 0:
+			DocsEmbed("%{_realdocs}%", "skhub", {_member}, {_msg}) #Fallback to skripthub if no results was found on skripttools
+			stop
 		set {_skhub} to new buttons row
 		set {_arg} to {_docs}
 		replace all " " with "_" in {_arg}
@@ -272,49 +274,59 @@ function DocsEmbed(docs: text, type: text, member: member, msg: message):
 			edit {_msg} to show {_b} with bot "SkriptBot"
 			set component of {_msg} to {_events}, {_effects}, {_expressions}, {_conditions}, {_skhub}
 	else if {_type} = "skhub":
-		set {_buttons} to new buttons row
-		add new button with url "suppress:%discord id of {_member}%" with style danger with content "Cancel" with reaction "x" to buttons of {_buttons}
+		if {_amount} > 1:
+			set {_buttons} to new buttons row
+			add new button with url "suppress:%discord id of {_member}%" with style danger with content "Cancel" with reaction "x" to buttons of {_buttons}
+			set footer of {_b} to "Showing results from skripthub docs!"
+		else:
+			set footer of {_b} to "Showing results from both skripttools & skripthub docs!"
 		set color of {_b} to color from rgb 0,255,0
-		set footer of {_b} to "Showing results from skripthub docs!"
-		edit {_msg} to show {_b} with bot "SkriptBot"
-		set component of {_msg} to {_events}, {_effects}, {_expressions}, {_conditions}, {_buttons}
+		if discord id of member author of {_msg} != "942161118682550343":
+			reply to {_msg} with {_b} with bot "SkriptBot" with row {_events}, {_effects}, {_expressions}, {_conditions}
+			#wait a tick
+			#add {_buttons} to components of {_msg} if {_amount} > 1
+		else:
+			edit {_msg} to show {_b} with bot "SkriptBot"
+			set component of {_msg} to {_events}, {_effects}, {_expressions}, {_conditions} and {_buttons}
+			#wait a tick
+			#add {_buttons} to components of {_msg} if {_amount} > 1
 
 function DocsAnswer(name: text, type: text, member: member, msg: message):
 	set {_name::*} to split {_name} at "("
 	set {_name} to {_name::1}
 	set {_nameaddon} to {_name::2}
-	broadcast "%{_name::2}%"
+	#broadcast "%{_name::2}%"
 	if {_type} = "sktools":
-		loop {docs::data::*}:
-			set {_name2} to {docs::data::%loop-index%::name}
-			set {_addon} to {docs::data::%loop-index%::addon}
+		loop {-docs::data::*}:
+			set {_name2} to {-docs::data::%loop-index%::name}
+			set {_addon} to {-docs::data::%loop-index%::addon}
 			if "%{_name}%" = "%{_name2}% ":
 				if "%{_nameaddon}%" = "%{_addon}%)": #Avoiding conflicting syntaxes with same addon name
-					set {_syntaxtype} to {docs::data::%loop-index%::type}
-					set {_desc} to {docs::data::%loop-index%::description}
-					set {_patterns} to join {docs::data::%loop-index%::patterns} with nl
-					set {_values} to join {docs::data::%loop-index%::event_values} by "\n"
-					set {_examples} to join {docs::data::%loop-index%::examples} with nl
-					set {_cancellable} to {docs::data::%loop-index%::cancellable}
+					set {_syntaxtype} to {-docs::data::%loop-index%::type}
+					set {_desc} to {-docs::data::%loop-index%::description}
+					set {_patterns} to join {-docs::data::%loop-index%::patterns} with nl
+					set {_values} to join {-docs::data::%loop-index%::event_values} by "\n"
+					set {_examples} to join {-docs::data::%loop-index%::examples} with nl
+					set {_cancellable} to {-docs::data::%loop-index%::cancellable}
 					stop loop
 	if {_type} = "skhub":
-		loop {skhubdocs::*}:
-			set {_name2} to {skhubdocs::%loop-index%::title}
-			set {_addon} to {skhubdocs::%loop-index%::addon::name} #Avoiding conflicting syntaxes with same addon name
+		loop {-skhubdocs::*}:
+			set {_name2} to {--skhubdocs::%loop-index%::title}
+			set {_addon} to {-skhubdocs::%loop-index%::addon::name} #Avoiding conflicting syntaxes with same addon name
 			if "%{_name}%" = "%{_name2}% ":
 				if "%{_nameaddon}%" = "%{_addon}%)":
-					set {_syntaxtype} to {skhubdocs::%loop-index%::syntax_type}
-					set {_desc} to {skhubdocs::%loop-index%::description}
-					set {_patterns} to join {skhubdocs::%loop-index%::syntax_pattern} with nl
-					set {_values::*} to split {skhubdocs::%loop-index%::event_values} at ","
+					set {_syntaxtype} to {-skhubdocs::%loop-index%::syntax_type}
+					set {_desc} to {-skhubdocs::%loop-index%::description}
+					set {_patterns} to join {-skhubdocs::%loop-index%::syntax_pattern} with nl
+					set {_values::*} to split {-skhubdocs::%loop-index%::event_values} at ","
 					#set {_examples} to join {skhubdocs::%loop-index%::examples} with nl #Skripthub api doesn't contains examples :(
-					set {_cancellable} to {skhubdocs::%loop-index%::event_cancellable}
+					set {_cancellable} to {-skhubdocs::%loop-index%::event_cancellable}
 					stop loop
-	broadcast "Patterns: %{_patterns}%"
-	broadcast "Desc: %{_desc}%"
-	broadcast "Examples: %{_examples}%"
+	#broadcast "Patterns: %{_patterns}%"
+	#broadcast "Desc: %{_desc}%"
+	#broadcast "Examples: %{_examples}%"
 	make embed:
-		set author of embed to "%{_name}% [%{_type}%]"
+		set author of embed to "%{_name}% [%{_syntaxtype}%]"
 		set color of embed to orange
 
 		add ":pencil: **Patterns:** ```applescript%nl%%{_patterns}%```" to {_l::*}
@@ -329,7 +341,7 @@ function DocsAnswer(name: text, type: text, member: member, msg: message):
 			if {_values} is set:
 				add ":placard: **Possible Event-Values:**``` %{_values}% ```" to {_l::*}
 			if {_values::1} is set:
-				broadcast "ta setado 2"
+				#broadcast "ta setado 2"
 				if "%{_values::1}%" doesn't contain "null" or "none" or "<none>":
 					add ":placard: **Possible Event-Values:**``` %join {_values::*} by nl%```" to {_l::*}
 			if {_syntaxtype} is "events" or "events":
@@ -354,17 +366,6 @@ function DocsAnswer(name: text, type: text, member: member, msg: message):
 	add new button with url "suppress:%discord id of {_member}%" with style danger with content "Cancel" with reaction "x" to buttons of {_buttons}
 	add {_buttons} to components of {_msg}
 
-button click:
-	set {_id::*} to split event-button at ":"
-	if {_id::1} = "back":
-		broadcast "%{_id::3}%"
-		if {_id::2} = "%discord id of event-member%":
-			replace all "_" with " " in {_id::4}
-			replace all "|" with ":" in {_id::4}
-			if last character of {_id::4} = " ":
-				set {_id::4} to subtext of "%{_id::4}%" from character 1 to (length of {_id::4} - 1)
-			DocsEmbed("%{_id::4}%", "%{_id::3}%", event-member, event-message)
-
 #Main docs command
 discord command .d [<text>]:
 	aliases: docs
@@ -376,13 +377,19 @@ discord command .d [<text>]:
 
 button click:
 	set {_id::*} to split event-button at ":"
-	if {_id::2} = "%discord id of event-member%":
+	if {_id::2} = discord id of event-member:
+		if {_id::2} = discord id of event-member:
+			replace all "_" with " " in {_id::4}
+			replace all "|" with ":" in {_id::4}
+			if last character of {_id::4} = " ":
+				set {_id::4} to subtext of "%{_id::4}%" from character 1 to (length of {_id::4} - 1)
+			DocsEmbed("%{_id::4}%", "%{_id::3}%", event-member, event-message)
 		if {_id::1} = "suppress":
 			#suppress embeds of event-message
 			destroy event-message
 		if {_id::1} = "skhub":
 			loop {_id::*}:
-				broadcast "Loop-Value: %loop-value%"
+				#broadcast "Loop-Value: %loop-value%"
 				add 1 to {_amount}
 				if {_amount} > 2:
 					set {_value} to loop-value
@@ -391,7 +398,7 @@ button click:
 					add {_value} to {_test::*}
 			set {_answer} to "%{_test::*}%"
 			replace all "," and "and" with "" in {_answer}
-			broadcast "Resposta: %{_answer}%"
+			#broadcast "Resposta: %{_answer}%"
 			DocsEmbed("%{_answer}%", "skhub", event-member, event-message)
 	else:
 		reply with hidden "Thats not your documentation interaction!"
@@ -401,7 +408,7 @@ dropdown interact:
 	set {_option} to event.getJDAEvent().getSelectedOptions().get(0)
 	set {_optionname} to {_option}.getLabel()
 	set {_optionid::*} to split {_option}.getValue() at ":"
-	if {_optionid::1} = "%discord id of event-member%":
+	if {_optionid::1} = discord id of event-member:
 		DocsAnswer({_optionname}, "%{_name::1}%", event-member, event-message)
 	else:
 		reply with hidden "Thats not your documentation interaction!"
@@ -421,7 +428,7 @@ discord command .indent [<text>]:
 
 discord command .format:
 	trigger:
-		set {_msg} to message content of referenced message of event-message
+		set {_msg} to "%referenced message of event-message%"
 		if {_msg} is not set:
 			make embed:
 				set title of embed to "Formatting Code In Discord"
@@ -429,6 +436,7 @@ discord command .format:
 				add inline field named "How it Looks" with value "\```on chat:%nl%broadcast ""This is how you format code!""```" to embed
 				add inline field named "The format" with value "```vb%nl%on chat:%nl%broadcast ""This is how you format code!""```" to embed
 				add field named "Extra Info" with value "On US keyboards, the grave character (`) is located above the tab key on the top left of the keyboard" to embed
+				set color of embed to color from rgb 0,255,0
 			reply to event-message with last embed with bot "SkriptBot"
 			stop
-		reply to event-message with "Formatted message: %nl% ```vb%{_msg}%```" with bot "SkriptBot"
+		reply to event-message with "```vb%nl%%{_msg}%```" with bot "SkriptBot"
