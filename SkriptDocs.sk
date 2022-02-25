@@ -6,17 +6,26 @@
 
 #Add an fallback if results wasn't found 23/02
 #Added 23/02
+#Added new commands 24/02
 
 effect generate docs:
 	trigger:
+		delete {-docs::*}
+		delete {-skhubdocs::*}
 		send a http request to "https://api.skripttools.net/v4/documentation"
 		if last http response's code = 200:
 			map json of last http response's body to {-docs::*}
+			loop {-docs::data::*}:
+				if {-docs::data::%loop-index%::id} is set:
+					add 1 to {-docsamount}
 		else:
 			broadcast "An exception has occured while generating docs! %nl% %last http response's body%"
 		send a http request to "https://api.skripttools.net/v4/documentation/skripthub"
 		if last http response's code = 200:
 			map json of last http response's body to {-skhubdocs::*}
+			loop {-skhubdocs::*}:
+				if {-skhubdocs::%loop-index%::syntax_type} is set:
+					add 1 to {-skhubdocsamount}
 		else:
 			broadcast "An exception has occured while generating docs! %nl% %last http response's body%"
 
@@ -311,7 +320,7 @@ function DocsAnswer(name: text, type: text, member: member, msg: message):
 					stop loop
 	if {_type} = "skhub":
 		loop {-skhubdocs::*}:
-			set {_name2} to {--skhubdocs::%loop-index%::title}
+			set {_name2} to {-skhubdocs::%loop-index%::title}
 			set {_addon} to {-skhubdocs::%loop-index%::addon::name} #Avoiding conflicting syntaxes with same addon name
 			if "%{_name}%" = "%{_name2}% ":
 				if "%{_nameaddon}%" = "%{_addon}%)":
@@ -415,7 +424,7 @@ dropdown interact:
 
 #Some commands ported from Skript Bot#3042 from Big_Bad_E#1446
 
-discord command .indent [<text>]:
+discord command .indent:
 	trigger:
 		set {_b} to new buttons row
 		add new link button with url "https://skripthub.net/tutorials/33" with style success with content "Indent" to buttons of {_b}
@@ -440,3 +449,59 @@ discord command .format:
 			reply to event-message with last embed with bot "SkriptBot"
 			stop
 		reply to event-message with "```vb%nl%%{_msg}%```" with bot "SkriptBot"
+
+#Suggestion from AyhamAlali#0001 :)
+discord command .docs-link:
+	trigger:
+		set {_b} to new buttons row
+		add new link button with url "https://docs.skunity.com/" with style danger with content "SkUnity Docs" with reaction "closed_book" to buttons of {_b}
+		add new link button with url "https://docs.skriptlang.org/" with style primary with content "SkriptLang Docs" with reaction "orange_book" to buttons of {_b}
+		add new link button with url "https://skripthub.net/docs/" with style success with content "SkriptHub Docs" with reaction "green_book" to buttons of {_b}
+		add new link button with url "https://skripttools.net/documentation" with style success with content "SkriptTools Docs" with reaction "orange_book" to buttons of {_b}
+		set {_builder} to a new message builder
+		append "Here's the list with the most known docs->%nl%%nl%" to {_builder}
+		append "**SkUnity** (Wrong and BaeFell and contributors)%nl%" to {_builder}
+		append "**SkriptLang** (SkriptLang Team)%nl%" to {_builder}
+		append "**SkriptHub** with over %{-skhubdocsamount}% syntaxes (eyesniper)%nl%" to {_builder}
+		append "**SkriptTools** with over %{-docsamount}% syntaxes (Deutro/SkUnity)" to {_builder}
+		make embed:
+			set description of embed to "%{_builder}%"
+			set color of embed to color from rgb 0,255,0
+		reply to event-message with last embed with bot "SkriptBot" with row {_b}
+
+discord command .%:
+	aliases: percentsign
+	trigger:
+		set {_b} to a new message builder
+		append "**When should percent signs be used in Skript?**%nl%" to {_b}
+		append "In Skript, the purpose of surrounding an expression in %% signs is letting Skript know you want it to be parsed as an expression and insert its value into the string or variable you've put it in.organization a breeze. A list basically maps objects to their corresponding unique indices.%nl%%nl%" to {_b}
+		append "**Incorrect Usage:**%nl%" to {_b}
+		append "```vb%nl%give dirt to %%player%% %nl%send ""Hey there player"" to %%arg-1%% %nl%kill %%{_entity}%% %nL%```" to {_b}
+		append "**Correct Usage:**%nl%" to {_b}
+		append "```vb%nl%broadcast ""%%player%% has joined!"" %nl%send ""%%{_variable::*}%%"" to player%nl%set {_variable::%%uuid of player%%} to 10```" to {_b}
+		make embed:
+			set description of embed to "%{_b}%"
+			set footer of embed to "Percent signs (%%)"
+			set color of embed to color from rgb 0,255,0
+		reply to event-message with last embed with bot "SkriptBot"
+
+discord command .tutorials:
+	aliases: t
+	trigger:
+		set {_b1} to new buttons row
+		set {_b2} to new buttons row
+		add new link button with url "https://skripthub.net/tutorials/17" with style primary with content "Getting Started" to buttons of {_b1}
+		add new link button with url "https://skripthub.net/tutorials/21" with style primary with content "Reading Syntaxes" to buttons of {_b1}
+		add new link button with url "https://skripthub.net/tutorials/33" with style primary with content "Indentations" to buttons of {_b1}
+		add new link button with url "https://skripthub.net/tutorials/35" with style primary with content "Conditions" to buttons of {_b1}
+		add new link button with url "https://skripthub.net/tutorials/43" with style primary with content "List Variables" to buttons of {_b1}
+
+		add new link button with url "https://skripthub.net/tutorials/50" with style primary with content "ScoreBoard" to buttons of {_b2}
+		add new link button with url "https://skripthub.net/tutorials/25" with style primary with content "Yaml" to buttons of {_b2}
+		add new link button with url "https://skripthub.net/tutorials/48" with style primary with content "Abilities" to buttons of {_b2}
+		add new link button with url "https://skripthub.net/tutorials/47" with style primary with content "Custom Crafts" to buttons of {_b2}
+		add new link button with url "https://skripthub.net/tutorials/51" with style primary with content "Custom Expressions" to buttons of {_b2}
+		make embed:
+			set description of embed to "Here's a list with many different tutorials%nl%From (SkriptHub)[https://skripthub.net/tutorials/]"
+			set color of embed to color from rgb 0,255,0
+		reply to event-message with last embed with bot "SkriptBot" with row {_b1}, {_b2}
