@@ -1,0 +1,288 @@
+load:
+	load all yaml from directory "plugins/Bee Swarm Simulator/giveaways" using the filename as id
+
+discord command -giveaway [<text>] [<text>]:
+	aliases: sorteio
+	executable in: guild
+	trigger:
+		if event-member has permission administrator:
+			if arg-1 is "criar" or "create":
+				set {_row} to new buttons row
+				add new button with url "cancel" with style danger with content "Cancel" with emoji "❌" to buttons of {_row}
+				reply with "%mention tag of event-member% Qual será o nome do giveaway? :thinking:" with row {_row}
+				set {creating::%discord id of event-member%::id} to discord id of event-message
+				set {creating::%discord id of event-member%::time} to 30 minutes from now
+				load yaml "plugins/giveaways/giveaway-%{id::%discord id of event-member%}%.yml" as "giveaway-cache-%{creating::%discord id of event-member%::id}%"
+				set yaml value "Name" from "giveaway-cache-%{creating::%discord id of event-member%::id}%" to true
+				set yaml value "Owner" from "giveaway-cache-%{creating::%discord id of event-member%::id}%" to discord id of event-member
+				set yaml value "Channel" from "giveaway-cache-%{creating::%discord id of event-member%::id}%" to discord id of event-channel
+				set yaml value "Guild" from "giveaway-cache-%{creating::%discord id of event-member%::id}%" to discord id of event-guild
+				save yaml "giveaway-cache-%{creating::%discord id of event-member%::id}%"
+			else if arg-1 is "end" or "finalizar":
+				if arg-2 is set:
+					load yaml "plugins/giveaways/guilds/%discord id of event-guild%.yml" as "giveaway-%discord id of event-guild%-%discord id of event-channel%-%discord id of event-member%"
+					if yaml "giveaway-%discord id of event-guild%-%discord id of event-channel%-%discord id of event-member%" is not empty:
+						if yaml path "Giveaway.%arg-2%.Winner" in "giveaway-%discord id of event-guild%-%discord id of event-channel%-%discord id of event-member%" does not exist:
+							if yaml path "Giveaway.%arg-2%.Participants" in "giveaway-%discord id of event-guild%-%discord id of event-channel%-%discord id of event-member%" exists:
+								if amount of yaml list "Giveaway.%arg-2%.Participants" in "giveaway-%discord id of event-guild%-%discord id of event-channel%-%discord id of event-member%" > 1:
+									set {_winner} to random element out of yaml list "Giveaway.%arg-2%.Participants" from "giveaway-%discord id of event-guild%-%discord id of event-channel%-%discord id of event-member%"
+									set {_member} to member with id "%{_winner}%" in guild with id yaml value "Giveaway.%arg-2%.Guild" from "giveaway-%discord id of event-guild%-%discord id of event-channel%-%discord id of event-member%"
+									set {_channel} to channel with id yaml value "Giveaway.%arg-2%.Channel" from "giveaway-%discord id of event-guild%-%discord id of event-channel%-%discord id of event-member%"
+									set yaml value "Giveaway.%arg-2%.Time" from "giveaway-%discord id of event-guild%-%discord id of event-channel%-%discord id of event-member%" to now
+									set yaml value "Giveaway.%arg-2%.Winner" from "giveaway-%discord id of event-guild%-%discord id of event-channel%-%discord id of event-member%" to "%{_winner}%"
+									remove {_member} from yaml list "Giveaway.%arg-2%.Participants" from "giveaway-%discord id of event-guild%-%discord id of event-channel%-%discord id of event-member%"
+									save yaml "giveaway-%discord id of event-guild%-%discord id of event-channel%-%discord id of event-member%"
+									unload yaml "giveaway-%discord id of event-guild%-%discord id of event-channel%-%discord id of event-member%"
+									send "Sorteio finalizado :tada:" to {_channel}
+									send "O ganhador foi %mention tag of {_a}%" to {_channel}
+								else:
+									reply to event-message with "Não houve participantes suficientes." with mentioning true
+									delete yaml "giveaway-%discord id of event-guild%-%discord id of event-channel%-%discord id of event-member%"
+									save yaml "giveaway-%discord id of event-guild%-%discord id of event-channel%-%discord id of event-member%"
+							else:
+								reply to event-message with "Não houve participantes." with mentioning true
+								delete yaml "giveaway-%discord id of event-guild%-%discord id of event-channel%-%discord id of event-member%"
+								save yaml "giveaway-%discord id of event-guild%-%discord id of event-channel%-%discord id of event-member%"
+						else:
+							reply to event-message with "Esse sorteio já foi finalizado! %nl% Use -giveaway reroll para re-sortear" with mentioning true
+							unload yaml "giveaway-%discord id of event-guild%-%discord id of event-channel%-%discord id of event-member%"
+					else:
+						reply to event-message with "Não encontrei nenhum sorteio com o id `%arg-2%`" with mentioning true
+						unload yaml "giveaway-%discord id of event-guild%-%discord id of event-channel%-%discord id of event-member%"
+			else if arg-1 is "reroll":
+				if arg-2 is set:
+					if yaml path "Giveaway.%arg-2%.Winner" in "giveaway-%discord id of event-guild%-%discord id of event-channel%-%discord id of event-member%" does not exist:
+						reply to event-message with "Esse sorteio ainda não terminou para você re-sortear! %nl% Use -giveaway finalizar se você desejá finalizar o sorteio" with mentioning true
+					else:
+						if amount of yaml list "Giveaway.%arg-2%.Participants" in "giveaway-%discord id of event-guild%-%discord id of event-channel%-%discord id of event-member%" >= 1:
+							reply with "Re-sortenado..."
+							set {_winner} to random element out of yaml list "Giveaway.%arg-2%.Participants" from "giveaway-%discord id of event-guild%-%discord id of event-channel%-%discord id of event-member%"
+							set {_a} to member with id "%{_winner}%" in guild with id yaml value "%arg-2%.Guild" from "giveaway-%discord id of event-guild%-%discord id of event-channel%-%discord id of event-member%"
+							send "O ganhador é %mention tag of {_a}% :tada:" to event-channel
+							set yaml value "Giveaway.%arg-2%.Time" from "giveaway-%discord id of event-guild%-%discord id of event-channel%-%discord id of event-member%" to now
+							set yaml value "Giveaway.%arg-2%.Winner" from "giveaway-%discord id of event-guild%-%discord id of event-channel%-%discord id of event-member%" to "%{_winner}%"
+							remove {_winner} from yaml list "Participants" from "giveaway-%discord id of event-guild%-%discord id of event-channel%-%discord id of event-member%"
+							save yaml "giveaway-%discord id of event-guild%-%discord id of event-channel%-%discord id of event-member%"
+							unload yaml "giveaway-%discord id of event-guild%-%discord id of event-channel%-%discord id of event-member%"
+						else:
+							reply with "Não existe mais ganhadores!"
+							unload yaml "giveaway-%discord id of event-guild%-%discord id of event-channel%-%discord id of event-member%"
+			else:
+				make embed:
+					set the title of the embed to ":closed_book: Comando: **-%the used aliases%**"
+					set the description of the embed to "Cria um sorteio neste canal."
+					add field named ":pencil2: Como usar" with value "**-%the used aliases% criar** %nl% Cria um sorteio para este canal" to embed
+					add field named "**-%the used aliases% reroll**" with value "Re-sorteia o sorteio deste canal" to embed
+					add field named "**-%the used aliases% finalizar**" with value "Finaliza o sorteio deste canal" to embed
+					set the color of the embed to color from rgb 0, 255, 0
+				send the last created embed to event-channel
+
+#message delete
+
+on message receive:
+	if event-member is not a discord bot:
+		yaml "giveaway-cache-%{creating::%discord id of event-member%::id}%" is loaded
+		set {_row} to new buttons row
+		add new button with url "cancel" with style danger with content "Cancel" with emoji "❌" to buttons of {_row}
+		if yaml value "Name" from "giveaway-cache-%{creating::%discord id of event-member%::id}%" is true:
+			set {_member} to yaml value "Owner" from "giveaway-cache-%{creating::%discord id of event-member%::id}%"
+			set {_channel} to yaml value "Channel" from "giveaway-cache-%{creating::%discord id of event-member%::id}%"
+			discord id of event-member = "%{_member}%"
+			discord id of event-channel = "%{_channel}%"
+			reply with "%mention tag of event-member% Qual será a descrição do sorteio? :thinking:" with row {_row}
+			set yaml value "Giveaway.%loop-value%.Name" from "giveaway-%discord id of event-guild%-%discord id of event-channel%-%discord id of event-member%" to message content of event-message
+			set yaml value "Giveaway.%loop-value%.Descricao" from "giveaway-%discord id of event-guild%-%discord id of event-channel%-%discord id of event-member%" to true
+			save yaml "giveaway-cache-%{creating::%discord id of event-member%::id}%"
+		else if yaml value "Giveaway.%loop-value%.Descricao" from "giveaway-%discord id of event-guild%-%discord id of event-channel%-%discord id of event-member%" is true:
+			set {_member} to yaml value "Owner" from "giveaway-cache-%{creating::%discord id of event-member%::id}%"
+			set {_channel} to yaml value "Channel" from "giveaway-cache-%{creating::%discord id of event-member%::id}%"
+			discord id of event-member = "%{_member}%"
+			discord id of event-channel = "%{_channel}%"
+			reply with "%mention tag of event-member% Qual será a duração do sorteio? :clock1: %nl% Exemplo: `(1 minute - 5 hour - 5 day)`" with row {_row}
+			set yaml value "Descricao" from "giveaway-cache-%{creating::%discord id of event-member%::id}%" to content of event-message
+			set yaml value "Duracao" from "giveaway-cache-%{creating::%discord id of event-member%::id}%" to true
+			save yaml "giveaway-cache-%{creating::%discord id of event-member%::id}%"
+			else if yaml value "Duracao" from "giveaway-cache-%{creating::%discord id of event-member%::id}%"  is true:
+				set {_member} to yaml value "Owner" from "giveaway-cache-%{creating::%discord id of event-member%::id}%"
+				set {_channel} to yaml value "Channel" from "giveaway-cache-%{creating::%discord id of event-member%::id}%"
+				discord id of event-member = "%{_member}%"
+				discord id of event-channel = "%{_channel}%"
+				if content of event-message parsed as timespan is set:
+					reply with "%mention tag of event-member% Deseja colocar estar no servidor X dias como requisito? %nl% Digite os dias em numeros ou responda com 'nao'" and store it in {_var}
+					react to {_var} with reaction "x"
+					set yaml value "Duracao" from "giveaway-cache-%{creating::%discord id of event-member%::id}%" to content of event-message
+					set yaml value "ReqTempo" from "giveaway-cache-%{creating::%discord id of event-member%::id}%" to true
+					save yaml "giveaway-cache-%{creating::%discord id of event-member%::id}%"
+				else:
+					reply with "%mention tag of event-member% :x: Tempo invalido, insira novamente!"
+			else if yaml value "ReqTempo" from "giveaway-cache-%{creating::%discord id of event-member%::id}%" is true:
+				set {_member} to yaml value "Owner" from "giveaway-cache-%{creating::%discord id of event-member%::id}%"
+				set {_channel} to yaml value "Channel" from "giveaway-cache-%{creating::%discord id of event-member%::id}%"
+				discord id of event-member = "%{_member}%"
+				discord id of event-channel = "%{_channel}%"
+				if message content of event-message = "no" or "nao":
+					set yaml value "ReqTempo" from "giveaway-cache-%{creating::%discord id of event-member%::id}%" to false
+					save yaml "giveaway-cache-%{creating::%discord id of event-member%::id}%"
+				else:
+					set yaml value "ReqTempo" from "giveaway-cache-%{creating::%discord id of event-member%::id}%" to content of event-message
+					save yaml "giveaway-cache-%{creating::%discord id of event-member%::id}%"
+				reply with "%mention tag of event-member% Deseja colocar um cargo como requisito?%nl%Mencione o cargo ou responda com 'nao'`" with row {_row}
+				set yaml value "ReqCargo" from "giveaway-%discord id of event-guild%-%discord id of event-channel%-%discord id of event-member%" to true
+				save yaml "giveaway-cache-%{creating::%discord id of event-member%::id}%"
+			else if yaml value "ReqCargo" from "giveaway-cache-%{creating::%discord id of event-member%::id}%" is true:
+				set {_member} to yaml value "Owner" from "giveaway-cache-%{creating::%discord id of event-member%::id}%"
+				set {_channel} to yaml value "Channel" from "giveaway-cache-%{creating::%discord id of event-member%::id}%"
+				discord id of event-member = "%{_member}%"
+				discord id of event-channel = "%{_channel}%"
+				if message content of event-message = "no" or "nao":
+					set yaml value "Giveaway.%loop-value%.ReqCargo" from "giveaway-cache-%{creating::%discord id of event-member%::id}%" to false
+					save yaml "giveaway-cache-%{creating::%discord id of event-member%::id}%"
+				else:
+					set {_var::*} to mentioned roles in event-message
+					if {_var::*} is set:
+						set yaml value "ReqCargo" from "giveaway-cache-%{creating::%discord id of event-member%::id}%" to discord id of {_var::1}
+						save yaml "giveaway-cache-%{creating::%discord id of event-member%::id}%"
+				set {_timer} to now
+				set {_timer2} to yaml value "Duracao" from "giveaway-%discord id of event-guild%-%discord id of event-channel%-%discord id of event-member%" parsed as timespan
+				add {_timer2} to {_timer}
+				set yaml value "Time" from "giveaway-cache-%{creating::%discord id of event-member%::id}%" to {_timer}
+				save yaml "giveaway-cache-%{creating::%discord id of event-member%::id}%"
+				set {_duration} to yaml value "Duracao" from "giveaway-%discord id of event-guild%-%discord id of event-channel%-%discord id of event-member%"
+				set {_title} to yaml value "Name" from "giveaway-%discord id of event-guild%-%discord id of event-channel%-%discord id of event-member%"
+				set {_description} to yaml value "Descricao" from "giveaway-%discord id of event-guild%-%discord id of event-channel%-%discord id of event-member%"
+				replace all "§" with "&" in {_description}
+				set {_now2} to "%unix timestamp of {_timer}%"
+				make embed:
+					set the title of embed to ":gift: %{_title}%"
+					set the description of the embed to "%{_description}% %nl% Use :tada: para participar %nl% termina em <t:%first 10 characters of {_now2}%:F>"
+					set the footer of the embed to discord name of event-guild
+					set the footer icon of the embed to avatar of event-guild
+					set the color of the embed to blue
+				send the last created embed to event-channel and store it in {_giveaway}
+				react to {_giveaway} with reaction "tada"
+				set yaml value "ID" from "giveaway-cache-%{creating::%discord id of event-member%::id}%" to discord id of {_giveaway}
+				save yaml "giveaway-cache-%{creating::%discord id of event-member%::id}%"
+
+on reaction remove:
+	discord id of event-member != "797967935133843456":
+		yaml "plugins/giveaways/%discord id of event-guild%/%discord id of event-channel%.yml" is loaded
+		if yaml value "Giveaway" from "plugins/giveaways/%discord id of event-guild%/%discord id of event-channel%.yml" is true:
+			set {_ID} to yaml value "ID" from "plugins/giveaways/%discord id of event-guild%/%discord id of event-channel%.yml"
+			discord id of event-message = "%{_ID}%"
+			if yaml list "Participants" from "plugins/giveaways/%discord id of event-guild%/%discord id of event-channel%.yml" contains discord id of event-member:
+				remove discord id of event-member from yaml list "Participants" from "plugins/giveaways/%discord id of event-guild%/%discord id of event-channel%.yml"
+				save yaml "plugins/giveaways/%discord id of event-guild%/%discord id of event-channel%.yml"
+				make embed:
+					set the title of the embed to "Giveaway"
+					set the description of the embed to ":x: Você saiu do sorteio!"
+					set footer of embed to discord name of event-guild
+					set footer icon of the embed to avatar of event-guild
+					set the color of the embed to color from rgb 255, 0, 0
+				send the last created embed to event-member
+
+on reaction add:
+	discord id of event-member != "797967935133843456":
+		yaml "plugins/giveaways/%discord id of event-guild%/%discord id of event-channel%.yml" is loaded
+		if discord name of event-emote is "x":
+			if yaml value "Name" from "plugins/giveaways/%discord id of event-guild%/%discord id of event-channel%.yml" exists:
+				if yaml value "ID" from "plugins/giveaways/%discord id of event-guild%/%discord id of event-channel%.yml" does not exist:
+					send ":x: Sorteio cancelado!" to event-channel
+					delete yaml "plugins/giveaways/%discord id of event-guild%/%discord id of event-channel%.yml"
+					save yaml "plugins/giveaways/%discord id of event-guild%/%discord id of event-channel%.yml"
+		else if discord name of event-emote is "tada":
+			remove event-emote added by event-member from event-message
+			if yaml value "Giveaway" from "plugins/giveaways/%discord id of event-guild%/%discord id of event-channel%.yml" is true:
+				set {_ID} to yaml value "ID" from "plugins/giveaways/%discord id of event-guild%/%discord id of event-channel%.yml"
+				discord id of event-message = "%{_ID}%"
+				if yaml path "Winner" in "Giveaway" exists:
+					remove event-emote added by event-member from event-message
+					make embed:
+						set the title of the embed to "Giveaway"
+						set the description of the embed to ":x: Você não pode entrar no sorteio porque ele já terminou!"
+						set footer of embed to discord name of event-guild
+						set footer icon of the embed to avatar of event-guild
+						set the color of the embed to color from rgb 255, 0, 0
+					send the last created embed to event-member
+				else:
+					if yaml value "ReqCargo" from "plugins/giveaways/%discord id of event-guild%/%discord id of event-channel%.yml" is false:
+						if yaml value "ReqTempo" from "plugins/giveaways/%discord id of event-guild%/%discord id of event-channel%.yml" is false:
+							add discord id of event-member to yaml list "Participants" from "plugins/giveaways/%discord id of event-guild%/%discord id of event-channel%.yml"
+							save yaml "plugins/giveaways/%discord id of event-guild%/%discord id of event-channel%.yml"
+							make embed:
+								set the title of the embed to "Giveaway"
+								set the description of the embed to ":white_check_mark: Você entrou no sorteio com sucesso!"
+								set footer of embed to discord name of event-guild
+								set the footer icon of the embed to avatar of event-guild
+								set the color of the embed to color from rgb 1, 255, 7
+							send the last created embed to event-member
+						else:
+							set {_days} to yaml value "ReqTempo" from "plugins/giveaways/%discord id of event-guild%/%discord id of event-channel%.yml"
+							set {_yml} to "%{_days}% days" parsed as timespan
+							set {_date} to {_yml} after join date of event-member
+							#subtract {_yml} parsed as timespan from {_date}
+							if now is more than or equal to {_date}:
+								add discord id of event-member to yaml list "Participants" from "plugins/giveaways/%discord id of event-guild%/%discord id of event-channel%.yml"
+								save yaml "plugins/giveaways/%discord id of event-guild%/%discord id of event-channel%.yml"
+								make embed:
+									set the title of the embed to "Giveaway"
+									set the description of the embed to ":white_check_mark: Você entrou no sorteio!"
+									set footer of embed to discord name of event-guild
+									set the footer icon of the embed to avatar of event-guild
+									set the color of the embed to color from rgb 1, 255, 7
+								send the last created embed to event-member
+							else:
+								remove event-emote added by event-member from event-message
+								make embed:
+									set the title of the embed to "Giveaway"
+									set the description of the embed to ":x: Você não pode entrar no sorteio! %nl%%nl% Você precisa estar pelo menos %{_days}% dias no servidor (%{_date}%) para entrar%nl%no sorteio"
+									set footer of embed to discord name of event-guild
+									set the footer icon of the embed to avatar of event-guild
+									set the color of the embed to color from rgb 255, 0, 0
+								send the last created embed to event-member
+					else:
+						set {_yml} to yaml value "ReqCargo" from "plugins/giveaways/%discord id of event-guild%/%discord id of event-channel%.yml"
+						set {_role} to role with id "%{_yml}%"
+						if event-member has role {_role}:
+							add discord id of event-member to yaml list "Participants" from "plugins/giveaways/%discord id of event-guild%/%discord id of event-channel%.yml"
+							save yaml "plugins/giveaways/%discord id of event-guild%/%discord id of event-channel%.yml"
+							make embed:
+								set the title of the embed to "Giveaway"
+								set the description of the embed to ":white_check_mark: Você entrou no sorteio!"
+								set footer of embed to discord name of event-guild
+								set footer icon of the embed to avatar of event-guild
+								set the color of the embed to color from rgb 1, 255, 7
+							send the last created embed to event-member
+						else:
+							remove event-emote added by event-member from event-message
+							make embed:
+								set the title of the embed to "Giveaway"
+								set the description of the embed to ":x: Você não pode entrar no sorteio! %nl% Você precisa do cargo %discord name of {_role}% para entrar!"
+								set footer of embed to discord name of event-guild
+								set footer icon of the embed to avatar of event-guild
+								set the color of the embed to color from rgb 255, 0, 0
+							send the last created embed to event-member
+
+every 30 seconds:
+	loop all currently loaded yaml files:
+		set {_now} to now
+		if yaml value "Time" from loop-value is less than {_now}:
+			set {_channel} to channel with id "%yaml value ""Channel"" from loop-value%"
+			if yaml path "Winner" from loop-value does not exist:
+				if amount of yaml list "Participants" from loop-value > 1:
+					set {_winner} to random element out of yaml list "Participants" from loop-value
+					set {_a} to member with id "%{_winner}%" in guild with id "729878767492661308"
+					send "Sorteio finalizado :tada:" to channel {_channel}
+					send "O ganhador foi %mention tag of {_a}%" to channel {_channel}
+					remove {_winner} from yaml list "Participants" from loop-value
+					set yaml value "Winner" from loop-value to "%{_winner}%"
+					save yaml loop-value
+					unload yaml loop-value
+				else:
+					send "Sorteio finalizado :tada:" to channel {_channel}
+					send "Não houve participantes suficientes." to channel {_channel}
+					delete yaml loop-value
+					save yaml loop-value
+			else:
+				set yaml value "Winner" from loop-value to "1"
+				save yaml loop-value
+				unload yaml loop-value
